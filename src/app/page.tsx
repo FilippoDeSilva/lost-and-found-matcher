@@ -56,7 +56,7 @@ function MatcherAppContent() {
     setIsSeeding(false);
   };
 
-  // Real-time Match Engine: Filter out low-confidence noise (< 50%) so creating a report doesn't create dummy cards
+  // Real-time Match Engine: Latest report timestamp matches ALWAYS come first!
   const matches = useMemo(() => {
     const lostList = reports.filter(r => r.type === 'LOST' && r.status === 'OPEN');
     const foundList = reports.filter(r => r.type === 'FOUND' && r.status === 'OPEN');
@@ -72,7 +72,22 @@ function MatcherAppContent() {
       }
     }
 
-    return results.sort((a, b) => b.overallScore - a.overallScore);
+    // Sort matches: Latest reports timestamp first!
+    return results.sort((a, b) => {
+      const timeA = Math.max(
+        new Date(a.lostReport.dateReported || a.lostReport.dateOccurred || 0).getTime(),
+        new Date(a.foundReport.dateReported || a.foundReport.dateOccurred || 0).getTime()
+      );
+      const timeB = Math.max(
+        new Date(b.lostReport.dateReported || b.lostReport.dateOccurred || 0).getTime(),
+        new Date(b.foundReport.dateReported || b.foundReport.dateOccurred || 0).getTime()
+      );
+
+      if (timeB !== timeA) {
+        return timeB - timeA; // Latest report pair comes first!
+      }
+      return b.overallScore - a.overallScore;
+    });
   }, [reports, confirmedMatchIds]);
 
   const lostCount = reports.filter(r => r.type === 'LOST' && r.status !== 'RESOLVED').length;
