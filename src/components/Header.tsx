@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
-import { LanguageSelector } from './LanguageSelector';
+import { LanguageSelector } from '@/components/LanguageSelector';
+import { PackageSearch, PlusCircle, Sparkles, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Sparkles, PackageSearch, Layers } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: 'matches' | 'reports';
@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
 
-        {/* Top Mobile Bar: Logo & Action Button */}
+        {/* Top Mobile/Desktop Bar: Logo & App Brand */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
@@ -53,21 +53,21 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Desktop Quick Stats & Language Selector */}
-        <div className="flex items-center justify-between md:justify-end gap-3 sm:gap-4">
-          <div className="hidden lg:flex items-center gap-5 bg-slate-950/50 border border-slate-800/80 rounded-2xl px-4 py-2">
+        {/* Live Quick Stats & Action Button */}
+        <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-5 bg-slate-950/50 border border-slate-800/80 rounded-2xl px-3 sm:px-4 py-1.5 sm:py-2">
             <div className="text-center">
-              <span className="block text-[11px] text-slate-400">{t('activeLost')}</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-400">{t('activeLost')}</span>
               <span className="text-xs sm:text-sm font-bold text-amber-400">{lostCount}</span>
             </div>
-            <div className="h-5 w-px bg-slate-800" />
+            <div className="h-4 sm:h-5 w-px bg-slate-800" />
             <div className="text-center">
-              <span className="block text-[11px] text-slate-400">{t('activeFound')}</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-400">{t('activeFound')}</span>
               <span className="text-xs sm:text-sm font-bold text-emerald-400">{foundCount}</span>
             </div>
-            <div className="h-5 w-px bg-slate-800" />
+            <div className="h-4 sm:h-5 w-px bg-slate-800" />
             <div className="text-center">
-              <span className="block text-[11px] text-slate-400">{t('matchesFound')}</span>
+              <span className="block text-[10px] sm:text-[11px] text-slate-400">{t('matchesFound')}</span>
               <span className="text-xs sm:text-sm font-bold text-cyan-400">{matchCount}</span>
             </div>
           </div>

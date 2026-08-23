@@ -1,16 +1,22 @@
 import { PrismaClient, ReportType, ReportCategory } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pkg from 'pg';
 
-const prisma = new PrismaClient();
+const { Pool } = pkg;
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/found-lost?schema=public';
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  console.log('🌱 Seeding Lost & Found Matcher Campus Database...');
+  console.log('🌱 Seeding Lost & Found Matcher Campus Database (found-lost)...');
 
   // Clear existing records to ensure clean seed state
   await prisma.matchRecord.deleteMany({});
   await prisma.report.deleteMany({});
 
-  // 1. AirPods Scenario (Prompt Example 1)
-  const lostAirpods = await prisma.report.create({
+  // 1. AirPods Scenario
+  await prisma.report.create({
     data: {
       type: ReportType.LOST,
       title: 'Black AirPods Case',
@@ -25,7 +31,7 @@ async function main() {
     }
   });
 
-  const foundEarbuds = await prisma.report.create({
+  await prisma.report.create({
     data: {
       type: ReportType.FOUND,
       title: 'Dark Wireless Earbud Case',
@@ -40,8 +46,8 @@ async function main() {
     }
   });
 
-  // 2. Library Backpack Scenario (Prompt Example 2)
-  const lostBackpack = await prisma.report.create({
+  // 2. Library Backpack Scenario
+  await prisma.report.create({
     data: {
       type: ReportType.LOST,
       title: 'Black Backpack with Laptop Charger',
@@ -55,7 +61,7 @@ async function main() {
     }
   });
 
-  const foundBackpackSameDay = await prisma.report.create({
+  await prisma.report.create({
     data: {
       type: ReportType.FOUND,
       title: 'Dark-Colored Backpack',
@@ -69,7 +75,7 @@ async function main() {
     }
   });
 
-  const foundBackpack2Weeks = await prisma.report.create({
+  await prisma.report.create({
     data: {
       type: ReportType.FOUND,
       title: 'Black Backpack on Field',
@@ -84,7 +90,7 @@ async function main() {
   });
 
   // 3. Multilingual Cross-Language Match (French Lost / Spanish Found)
-  const lostFrenchBag = await prisma.report.create({
+  await prisma.report.create({
     data: {
       type: ReportType.LOST,
       title: 'Sac à dos bleu avec gourde',
@@ -98,7 +104,7 @@ async function main() {
     }
   });
 
-  const foundSpanishBag = await prisma.report.create({
+  await prisma.report.create({
     data: {
       type: ReportType.FOUND,
       title: 'Mochila azul con termo',
@@ -112,7 +118,7 @@ async function main() {
     }
   });
 
-  console.log('✅ Database seeded successfully with 7 campus reports!');
+  console.log('✅ Database seeded successfully with 7 campus reports in found-lost PostgreSQL DB!');
 }
 
 main()
@@ -122,4 +128,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

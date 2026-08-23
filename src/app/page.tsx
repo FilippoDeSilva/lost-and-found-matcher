@@ -56,7 +56,7 @@ function MatcherAppContent() {
     setIsSeeding(false);
   };
 
-  // Real-time Match Engine evaluated over Database Reports
+  // Real-time Match Engine: Filter out low-confidence noise (< 50%) so creating a report doesn't create dummy cards
   const matches = useMemo(() => {
     const lostList = reports.filter(r => r.type === 'LOST' && r.status === 'OPEN');
     const foundList = reports.filter(r => r.type === 'FOUND' && r.status === 'OPEN');
@@ -66,7 +66,7 @@ function MatcherAppContent() {
     for (const lost of lostList) {
       for (const found of foundList) {
         const match = calculateReportMatch(lost, found);
-        if (!confirmedMatchIds.has(match.id)) {
+        if (match.overallScore >= 50 && !confirmedMatchIds.has(match.id)) {
           results.push(match);
         }
       }
@@ -144,8 +144,8 @@ function MatcherAppContent() {
               <Database className="w-4 h-4 text-emerald-400" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-200 block">Prisma & PostgreSQL / Supabase Connected</span>
-              <span className="text-[11px] text-slate-400">All reports, confirmed matches, and statuses are persisted in database</span>
+              <span className="text-xs font-bold text-slate-200 block">PostgreSQL (found-lost) & Prisma Connected</span>
+              <span className="text-[11px] text-slate-400">All reports, confirmed matches, and statuses are stored directly in your local PostgreSQL database</span>
             </div>
           </div>
 
