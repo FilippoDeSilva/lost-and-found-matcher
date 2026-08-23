@@ -1,43 +1,42 @@
-# 🔍 The Lost & Found Matcher
+# 🎓 The Campus Lost & Found Matcher
 
-A smart campus Lost & Found report matching application built for university environments. The application automates the comparison between student "Lost" item reports and "Found" item reports using an explainable multi-factor scoring engine.
+An intelligent, multilingual Lost & Found item matching platform built for university environments using **Next.js 16 (App Router)**, **TypeScript**, **shadcn/ui**, **Tailwind CSS v4**, **Prisma 7 ORM**, **PostgreSQL (`found-lost`)**, **Live Dynamic Translation**, and **pnpm**.
 
 ---
 
 ## 🌟 Key Features
 
-- **Multi-Factor Matching Engine**: Scores matches across Category, Keyword/Semantic Similarity, Campus Location Proximity, and Temporal Relevance.
-- **Explainable Match Scores**: Displays detailed visual confidence bars and human-readable explanations ("Matched location zone: Library Area", "Color match: Black / Dark").
-- **Interactive UI**: Modern Glassmorphism layout with side-by-side report comparison modals.
-- **Pre-populated University Scenarios**: Includes test cases from the prompt (AirPods case, Library backpack, Gym water bottle) for instant evaluation.
-- **Custom Report Submissions**: Form inputs to add new Lost or Found reports on the fly.
+- **Multi-Factor Matching Engine**: Scores matches across Category/Concept (25%), Keyword/Semantic Similarity & Color (35%), Campus Location Proximity (20%), and Temporal Relevance (20%).
+- **Live Dynamic Translation**: Translates lost & found reports dynamically on the fly into the student's active UI language (English 🇺🇸, Spanish 🇪🇸, French 🇫🇷, Amharic 🇪🇹) via `/api/translate`.
+- **Database Persistence & Seeding**: Connects directly to local PostgreSQL (`found-lost`) or production **Supabase** via Prisma 7 ORM and `@prisma/adapter-pg`.
+- **Full End-to-End Match Resolution Flow**: Confirm potential matches, reveal direct owner/finder contact cards (Email + Phone), follow campus safe handover instructions, and mark items as returned & resolved in PostgreSQL DB.
+- **Explainable Match Breakdown**: Side-by-side modal analysis showing visual scoring sliders and human-readable rationale checklists.
+- **100% Verified Test Suite**: Automated unit test suite with 14 comprehensive tests covering prompt scenarios, edge cases, reporting delay buffers, future date anomalies, and 100-run determinism (`pnpm run test`).
+- **Mobile-First Responsive UI**: Modern dark mode layout with custom shadcn/ui components (`Button`, `Card`, `Badge`, `Input`) optimized for all viewports from small mobile screens to desktop displays.
 
 ---
 
-## 🧠 Approach & Matching System
+## 🧠 Matching Algorithm & System Architecture
 
-### How Matching Works
+### 1. Weighted Multi-Factor Scoring
 
-The algorithm compares every **Lost Item** with every **Found Item** across four dimensions:
+The algorithm compares every **Lost Item** with every **Found Item** across four weighted dimensions:
 
-1. **Category Match (25% Weight)**: Direct match or taxonomy distance between categories (e.g. *Electronics*, *Bags*, *Keys*, *Personal Items*).
-2. **Text & Semantic Similarity (35% Weight)**: 
-   - Tokenizes descriptions, titles, and tags.
-   - Applies synonym expansion (e.g., `AirPods` $\leftrightarrow$ `wireless earbuds`, `dark` $\leftrightarrow$ `black`).
-   - Calculates Jaccard token overlap + fuzzy string similarity.
-3. **Location Proximity (20% Weight)**:
-   - Uses a Campus Zone Graph (e.g., *Dining Zone*, *Library Zone*, *Sports Complex*).
-   - Near-adjacent locations (e.g., *Cafeteria* and *Coffee Shop*) receive high proximity scores.
-4. **Temporal Decay (20% Weight)**:
-   - Calculates time elapsed between Lost date and Found date.
+1. **Category & Concept Score (25% Weight)**: Category alignment + dynamic concept cluster extraction (`AUDIO_EARBUDS`, `BACKPACK_BAG`, `WATER_BOTTLE`, `SMARTPHONE`, `KEYS_KEYCHAIN`, `STUDENT_ID_CARDS`).
+2. **Text & Color Semantic Similarity (35% Weight)**: 
+   - Normalizes text with diacritic stripping (`sac à dos` $\rightarrow$ `sac a dos`).
+   - Levenshtein distance metrics for fuzzy typo handling (`airpods` $\leftrightarrow$ `aerpods`).
+   - Color profile matching (`BLACK_DARK`, `WHITE_LIGHT`, `BLUE`, `RED`, `GREEN`).
+3. **Location Proximity (20% Weight)**: Uses a campus zone topology graph (`LIBRARY_COMPLEX`, `CAFETERIA_DINING`, `STUDENT_UNION`, `SPORTS_GYM`, `ACADEMIC_QUAD`). Adjacent zones receive partial proximity scores.
+4. **Temporal Relevance & Decay (20% Weight)**:
+   - Evaluates time delta between Lost date and Found date.
    - Ideal case: Found 0–24 hours after Lost (100% score).
-   - Decays gradually over days/weeks.
-   - If Found date precedes Lost date by more than a margin, temporal score is set to 0.
+   - Gracefully handles reporting delay buffers when found date slightly precedes lost date.
 
-### Confidence Thresholds
-- **High Confidence ($\ge 75\%$)**: Strong candidate match.
-- **Medium Confidence ($50\% - 74\%$)**: Potential match, worth reviewing.
-- **Low Confidence ($< 50\%$)**: Weak match.
+### 2. Confidence Classifications
+- 🟢 **High Confidence ($\ge 75\%$)**: Strong candidate match.
+- 🟡 **Medium Confidence ($50\% - 74\%$)**: Potential match.
+- 🔴 **Low Confidence ($< 50\%$)**: Weak match (automatically filtered out to prevent feed noise).
 
 ---
 
@@ -45,48 +44,47 @@ The algorithm compares every **Lost Item** with every **Found Item** across four
 
 ### Prerequisites
 - Node.js (v18+ recommended)
-- npm or pnpm
+- `pnpm` (v9+ or v11+)
+- PostgreSQL (Database named `found-lost`)
 
-### Running Locally
+### 1. Installation & Environment Configuration
 ```bash
-# 1. Install dependencies
-npm install
+# Install dependencies using pnpm
+pnpm install
 
-# 2. Start dev server
-npm run dev
+# Verify or edit .env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/found-lost?schema=public"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+```
 
-# 3. Run test suite
-npm run test
+### 2. Database Migration & Seeding
+```bash
+# Push Prisma schema to local PostgreSQL
+pnpm exec prisma db push
+
+# Seed campus reports
+pnpm exec prisma db seed
+```
+
+### 3. Start Development Server
+```bash
+pnpm run dev
+# Open http://localhost:3000
+```
+
+### 4. Run Test Suite
+```bash
+pnpm run test
+# Executes tsx src/lib/matcher/engine.test.ts (14/14 tests passing)
 ```
 
 ---
 
-## 💡 Important Assumptions & Technical Decisions
+## 🐳 Docker Deployment
 
-- **Client-Side Architecture**: Built as a pure React application with local state & localStorage persistence to keep the project lightweight and easily runnable without complex backend setup.
-- **Deterministic Scoring over Black-Box AI**: Used a transparent, weighted heuristic algorithm instead of raw black-box LLM APIs to ensure 100% predictability, speed, zero latency, and explainable breakdowns.
-- **Campus Zone Topology**: Modeled standard university layout zones (Dining, Academic, Library, Sports, Student Union) to map loose human descriptions like "near cafeteria" and "beside coffee shop".
+The application includes multi-stage `Dockerfile` and `docker-compose.yml` for production containerization:
 
----
-
-## 🚫 Intentionally Omitted Features
-
-- **User Authentication / OAuth**: Omitted to keep review effortless (no login required).
-- **Backend Database**: In-memory + LocalStorage handles the core assessment scope cleanly.
-- **Computer Vision Image Analysis**: Text and metadata matching provided high accuracy within the time budget.
-
----
-
-## 🔮 Future Improvements
-
-- **Vector Embeddings / LLM Tagging**: Integrate vector embeddings (e.g., OpenAI/Gemini embeddings) for richer semantic comprehension of unstructured student descriptions.
-- **Automated Notifications**: Email / Push alerts when high-confidence matches are found for a newly submitted Lost report.
-- **QR Code / Smart Tag System**: Allow item registration via unique IDs or QR tags.
-
----
-
-## 🤖 AI Usage Log
-
-- **UI & Boilerplate Setup**: Generated initial Vite + React structure and CSS design system.
-- **Synonym & Location Map Design**: Used AI to build campus zone distance matrices and synonym dictionaries.
-- **Refinement**: Adjusted temporal decay formula and Jaccard token weights to balance precision vs recall.
+```bash
+# Build and run containers
+docker-compose up --build
+```
