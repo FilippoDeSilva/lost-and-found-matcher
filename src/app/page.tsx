@@ -3,22 +3,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ItemReport, MatchResult } from '@/types';
 import { calculateReportMatch } from '@/lib/matcher/engine';
-import { LanguageProvider, useTranslation } from '@/lib/i18n/LanguageContext';
+import { LanguageProvider } from '@/lib/i18n/LanguageContext';
 import { Header } from '@/components/Header';
 import { MatchFeed } from '@/components/MatchFeed';
 import { ItemGrid } from '@/components/ItemGrid';
 import { MatchDetailModal } from '@/components/MatchDetailModal';
 import { ReportModal } from '@/components/ReportModal';
-import { Database, RefreshCw, Loader2 } from 'lucide-react';
 
 function MatcherAppContent() {
-  const { t } = useTranslation();
   const [reports, setReports] = useState<ItemReport[]>([]);
   const [activeTab, setActiveTab] = useState<'matches' | 'reports'>('matches');
   const [selectedMatch, setSelectedMatch] = useState<MatchResult | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [confirmedMatchIds, setConfirmedMatchIds] = useState<Set<string>>(new Set());
-  const [isSeeding, setIsSeeding] = useState(false);
 
   // Fetch real database records from Prisma DB API
   const loadDatabaseReports = async () => {
@@ -38,23 +35,6 @@ function MatcherAppContent() {
   useEffect(() => {
     loadDatabaseReports();
   }, []);
-
-  // Trigger Database Reset & Seeding via Prisma DB API
-  const handleSeedDatabase = async () => {
-    setIsSeeding(true);
-    try {
-      const res = await fetch('/api/seed', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.reports) {
-          setReports(data.reports);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to seed database:', err);
-    }
-    setIsSeeding(false);
-  };
 
   // Real-time Match Engine: Latest report timestamp matches ALWAYS come first!
   const matches = useMemo(() => {
@@ -84,7 +64,7 @@ function MatcherAppContent() {
       );
 
       if (timeB !== timeA) {
-        return timeB - timeA; // Latest report pair comes first!
+        return timeB - timeA;
       }
       return b.overallScore - a.overallScore;
     });
@@ -151,30 +131,6 @@ function MatcherAppContent() {
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 sm:space-y-8">
-        
-        {/* Database Persistence Bar */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <Database className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-slate-200 block">PostgreSQL (found-lost) & Prisma Connected</span>
-              <span className="text-[11px] text-slate-400">All reports, confirmed matches, and statuses are stored directly in your local PostgreSQL database</span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <button
-              disabled={isSeeding}
-              onClick={handleSeedDatabase}
-              className="flex-1 md:flex-initial px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-colors flex items-center justify-center gap-1.5"
-            >
-              {isSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />}
-              <span>{isSeeding ? 'Seeding DB...' : 'Re-Seed Database Records'}</span>
-            </button>
-          </div>
-        </div>
 
         {/* Tab Views */}
         {activeTab === 'matches' ? (
