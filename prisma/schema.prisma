@@ -1,0 +1,68 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ReportType {
+  LOST
+  FOUND
+}
+
+enum ReportCategory {
+  ELECTRONICS
+  BAGS
+  CLOTHING
+  KEYS
+  DOCUMENTS
+  PERSONAL_ITEMS
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  MATCHED
+  RESOLVED
+}
+
+model Report {
+  id               String         @id @default(uuid())
+  type             ReportType
+  title            String
+  category         ReportCategory
+  description      String
+  originalLanguage String         @default("en")
+  locationName     String
+  locationZoneId   String
+  dateOccurred     DateTime
+  dateReported     DateTime       @default(now())
+  status           ReportStatus   @default(OPEN)
+  contactEmail     String
+  contactPhone     String?
+  imageUrl         String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  lostMatches      MatchRecord[]  @relation("LostReportMatches")
+  foundMatches     MatchRecord[]  @relation("FoundReportMatches")
+}
+
+model MatchRecord {
+  id              String   @id @default(uuid())
+  lostReportId    String
+  foundReportId   String
+  overallScore    Int
+  confidence      String   // HIGH, MEDIUM, LOW
+  categoryScore   Int
+  textScore       Int
+  locationScore   Int
+  timeScore       Int
+  reasons         String   // JSON string array
+  status          String   @default("SUGGESTED") // SUGGESTED, CONFIRMED, DISMISSED
+  createdAt       DateTime @default(now())
+
+  lostReport      Report   @relation("LostReportMatches", fields: [lostReportId], references: [id], onDelete: Cascade)
+  foundReport     Report   @relation("FoundReportMatches", fields: [foundReportId], references: [id], onDelete: Cascade)
+}

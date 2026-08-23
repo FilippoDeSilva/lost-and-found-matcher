@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Container
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: matcher_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: matcher_user
+      POSTGRES_PASSWORD: matcher_password
+      POSTGRES_DB: lost_and_found_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matcher_user -d lost_and_found_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Application Container
+  web_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: matcher_nextjs_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://matcher_user:matcher_password@postgres_db:5432/lost_and_found_db?schema=public
+      - NODE_ENV=production
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
