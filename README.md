@@ -44,7 +44,7 @@ The algorithm compares every **Lost Item** with every **Found Item** across four
 
 ### Prerequisites
 - Node.js (v18+ recommended)
-- `pnpm` (v9+ or v11+)
+- `pnpm` (v11+)
 - PostgreSQL (Database named `found-lost`)
 
 ### 1. Installation & Environment Configuration
