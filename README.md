@@ -88,3 +88,22 @@ The application includes multi-stage `Dockerfile` and `docker-compose.yml` for p
 # Build and run containers
 docker-compose up --build
 ```
+
+---
+
+## 🤖 AI Usage Log & Human Engineering Direction
+
+This project was built through a collaborative pair-programming workflow, where **Human Engineering Leadership** provided overall architecture, strict edge-case guidelines, technology selection, and domain-specific rules, while **AI Assistance** accelerated code generation and component refactoring:
+
+### 👤 Human Engineering Direction & Decisions
+- **Architecture & Framework Selection**: Directed the complete transition to Next.js 16 (App Router), TypeScript, pnpm v11, Prisma 7 ORM (`@prisma/adapter-pg`), and local PostgreSQL (`found-lost`) / Supabase.
+- **Dynamic Translation over Static Tables**: Specified live dynamic translation (`/api/translate` & `useTranslatedReport`) to replace hardcoded dictionary tables and support infinite language scaling.
+- **Match Resolution & Contact Action Plan**: Designed the complete handover lifecycle (Confirming matches, revealing direct owner/finder email/phone cards, safe campus meeting steps, and updating report statuses to `RESOLVED` in DB).
+- **Edge Case & Anomaly Rules**: Defined strict evaluation rules for missing date fallbacks, reporting delay buffers ($\le 24\text{h}$ found-before-lost), future date inversions ($+7\text{ days}$), and low-confidence match noise filtering ($\ge 50\%$).
+- **LIFO Latest-First Ordering**: Specified newest-first sorting for both report grids and potential match pairs.
+- **Build Approvals & Deployment Setup**: Directed non-interactive `pnpm approve-builds` handling in Docker and Vercel `postinstall` prisma generation hooks.
+
+### 🤖 AI Assistance & Code Execution
+- **Component & Style Generation**: Accelerated creation of React 19 components with shadcn/ui primitives (`Button`, `Card`, `Badge`, `Input`) and Tailwind CSS v4 styling.
+- **Engine Implementation**: Implemented weighted scoring algorithms, Levenshtein distance metrics, and NFD diacritic stripping functions based on human specification.
+- **Automated Test Suite Creation**: Built the 14-scenario automated test runner (`pnpm run test`) validating determinism and edge cases.
