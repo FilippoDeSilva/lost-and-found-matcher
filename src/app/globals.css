@@ -24,3 +24,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Ensure hand cursor (pointer) on all interactive elements */
+button,
+select,
+option,
+a,
+[role="button"] {
+  cursor: pointer !important;
+}
