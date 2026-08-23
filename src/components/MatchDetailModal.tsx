@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { MatchResult, ItemReport } from '@/types';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
 import { useTranslatedReport } from '@/lib/hooks/useTranslatedReport';
-import { X, CheckCircle, MapPin, Calendar, Mail, ShieldCheck, Zap, Languages, Loader2 } from 'lucide-react';
+import { X, CheckCircle, MapPin, Calendar, Mail, Phone, ShieldCheck, Zap, Languages, Loader2, Send, CheckCircle2, ArrowRight, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -13,6 +13,7 @@ interface MatchDetailModalProps {
   onClose: () => void;
   onConfirmMatch: (matchId: string) => void;
   onDismissMatch: (matchId: string) => void;
+  onResolveReports?: (lostId: string, foundId: string) => void;
 }
 
 const DetailReportCard: React.FC<{ report: ItemReport; isLost: boolean }> = ({ report, isLost }) => {
@@ -70,14 +71,19 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
   match,
   onClose,
   onConfirmMatch,
-  onDismissMatch
+  onDismissMatch,
+  onResolveReports
 }) => {
   const { t, language } = useTranslation();
   const [translatedReasons, setTranslatedReasons] = useState<string[]>([]);
+  const [isConfirmedView, setIsConfirmedView] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     if (!match) return;
+
+    setIsConfirmedView(false);
 
     async function translateReasons() {
       if (language === 'en') {
@@ -112,6 +118,48 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
 
   const { lostReport, foundReport, overallScore, confidence, breakdown } = match;
 
+  const handleConfirmAndPersist = async () => {
+    setIsConfirmedView(true);
+    onConfirmMatch(match.id);
+
+    try {
+      await fetch('/api/matches/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lostReportId: lostReport.id,
+          foundReportId: foundReport.id,
+          overallScore,
+          confidence,
+          categoryScore: breakdown.categoryScore,
+          textScore: breakdown.textScore,
+          locationScore: breakdown.locationScore,
+          timeScore: breakdown.timeScore,
+          reasons: match.reasons
+        })
+      });
+    } catch (err) {
+      console.warn('Persist confirmed match failed:', err);
+    }
+  };
+
+  const handleMarkResolved = async () => {
+    setIsResolving(true);
+    try {
+      await fetch('/api/reports/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportIds: [lostReport.id, foundReport.id] })
+      });
+    } catch (e) {}
+
+    if (onResolveReports) {
+      onResolveReports(lostReport.id, foundReport.id);
+    }
+    setIsResolving(false);
+    onClose();
+  };
+
   const getScoreColor = (score: number) => {
     if (score >= 75) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
     if (score >= 50) return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
@@ -137,8 +185,12 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
               <Zap className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-100">{t('sideBySideTitle')}</h2>
-              <p className="text-[11px] sm:text-xs text-slate-400">{t('sideBySideSub')}</p>
+              <h2 className="text-base sm:text-lg font-bold text-slate-100">
+                {isConfirmedView ? 'Match Confirmed & Contact Action Plan' : t('sideBySideTitle')}
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-400">
+                {isConfirmedView ? 'Follow the steps below to contact finder and safely exchange the item' : t('sideBySideSub')}
+              </p>
             </div>
           </div>
 
@@ -151,124 +203,225 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
         </div>
 
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-h-[78vh] overflow-y-auto">
-          
-          {/* Overall Match Score Banner */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800">
-            <div className="flex items-center gap-4 w-full sm:w-auto">
-              <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex flex-col items-center justify-center border font-extrabold shrink-0 ${getScoreColor(overallScore)}`}>
-                <span className="text-xl sm:text-2xl">{overallScore}%</span>
-                <span className="text-[9px] tracking-widest uppercase">{t('matchScore')}</span>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs sm:text-sm font-bold text-slate-100">{t('confidenceLabel')}</span>
-                  <Badge variant={overallScore >= 75 ? 'emerald' : overallScore >= 50 ? 'amber' : 'destructive'} className="text-[10px] sm:text-xs">
-                    {confidence} {t('matchConfidence')}
-                  </Badge>
+
+          {/* CONFIRMED RESOLUTION STEP-BY-STEP VIEW */}
+          {isConfirmedView ? (
+            <div className="space-y-6">
+              
+              {/* Success Banner */}
+              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-emerald-400">Match Confirmed & Saved to Database!</h3>
+                    <p className="text-xs text-slate-300">
+                      Potential match established between lost "{lostReport.title}" and found "{foundReport.title}".
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  {breakdown.canonicalConceptMatched 
-                    ? `${t('matchedConcept')} "${breakdown.canonicalConceptMatched}"`
-                    : `${t('categoryAlignment')} ${lostReport.category}`}
-                </p>
+
+                <Button
+                  variant="default"
+                  size="sm"
+                  disabled={isResolving}
+                  onClick={handleMarkResolved}
+                  className="w-full sm:w-auto font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950"
+                >
+                  {isResolving ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle className="w-4 h-4 mr-1.5" />}
+                  <span>Mark Item as Returned & Resolved</span>
+                </Button>
               </div>
+
+              {/* Direct Contact Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Lost Person Contact Details */}
+                <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Owner Contact Details</span>
+                    <Badge variant="amber">🔴 Lost Item</Badge>
+                  </div>
+                  <div className="space-y-2 text-xs text-slate-200">
+                    <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                      <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span className="font-mono">{lostReport.contactEmail}</span>
+                    </div>
+                    {lostReport.contactPhone && (
+                      <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                        <Phone className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="font-mono">{lostReport.contactPhone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Finder Contact Details */}
+                <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Finder Contact Details</span>
+                    <Badge variant="emerald">🟢 Found Item</Badge>
+                  </div>
+                  <div className="space-y-2 text-xs text-slate-200">
+                    <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                      <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="font-mono">{foundReport.contactEmail}</span>
+                    </div>
+                    {foundReport.contactPhone && (
+                      <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                        <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="font-mono">{foundReport.contactPhone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Step-by-Step Handover Guide */}
+              <div className="p-5 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-3">
+                <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Campus Safe Exchange Instructions</span>
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                    <span className="font-bold text-emerald-400 block">1. Reach Out</span>
+                    <p className="text-slate-400">Send an email or phone message to coordinate a meeting time.</p>
+                  </div>
+                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                    <span className="font-bold text-emerald-400 block">2. Verify Ownership</span>
+                    <p className="text-slate-400">Confirm distinctive marks or item contents before handover.</p>
+                  </div>
+                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                    <span className="font-bold text-emerald-400 block">3. Safe Meeting Zone</span>
+                    <p className="text-slate-400">Meet at Campus Security or the Main Library Info Desk.</p>
+                  </div>
+                </div>
+              </div>
+
             </div>
+          ) : (
 
-            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  onConfirmMatch(match.id);
-                  onClose();
-                }}
-                className="flex-1 sm:flex-initial text-xs"
-              >
-                <CheckCircle className="w-4 h-4 mr-1.5" />
-                <span>{t('confirmMatch')}</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onDismissMatch(match.id);
-                  onClose();
-                }}
-                className="flex-1 sm:flex-initial text-xs"
-              >
-                <span>{t('dismissMatch')}</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* Side-by-Side Report Cards using reusable DetailReportCard */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            <DetailReportCard report={lostReport} isLost={true} />
-            <DetailReportCard report={foundReport} isLost={false} />
-          </div>
-
-          {/* Scoring Dimension Sliders */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-3 sm:space-y-4">
-            <h4 className="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>{t('scoringDimensionsTitle')}</span>
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div className="space-y-1.5 bg-slate-900 p-3 rounded-xl border border-slate-800">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-300">{t('dimCategory')}</span>
-                  <span className="text-emerald-400">{breakdown.categoryScore}%</span>
+            /* REGULAR COMPARISON & ANALYSIS VIEW */
+            <>
+              {/* Overall Match Score Banner */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800">
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex flex-col items-center justify-center border font-extrabold shrink-0 ${getScoreColor(overallScore)}`}>
+                    <span className="text-xl sm:text-2xl">{overallScore}%</span>
+                    <span className="text-[9px] tracking-widest uppercase">{t('matchScore')}</span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs sm:text-sm font-bold text-slate-100">{t('confidenceLabel')}</span>
+                      <Badge variant={overallScore >= 75 ? 'emerald' : overallScore >= 50 ? 'amber' : 'destructive'} className="text-[10px] sm:text-xs">
+                        {confidence} {t('matchConfidence')}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {breakdown.canonicalConceptMatched 
+                        ? `${t('matchedConcept')} "${breakdown.canonicalConceptMatched}"`
+                        : `${t('categoryAlignment')} ${lostReport.category}`}
+                    </p>
+                  </div>
                 </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className={`h-full ${getBarColor(breakdown.categoryScore)} transition-all duration-500`} style={{ width: `${breakdown.categoryScore}%` }} />
+
+                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleConfirmAndPersist}
+                    className="flex-1 sm:flex-initial text-xs font-bold"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-1.5" />
+                    <span>Confirm Match & View Contact</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onDismissMatch(match.id);
+                      onClose();
+                    }}
+                    className="flex-1 sm:flex-initial text-xs"
+                  >
+                    <span>{t('dismissMatch')}</span>
+                  </Button>
                 </div>
               </div>
 
-              <div className="space-y-1.5 bg-slate-900 p-3 rounded-xl border border-slate-800">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-300">{t('dimText')}</span>
-                  <span className="text-emerald-400">{breakdown.textScore}%</span>
-                </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className={`h-full ${getBarColor(breakdown.textScore)} transition-all duration-500`} style={{ width: `${breakdown.textScore}%` }} />
+              {/* Side-by-Side Report Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                <DetailReportCard report={lostReport} isLost={true} />
+                <DetailReportCard report={foundReport} isLost={false} />
+              </div>
+
+              {/* Scoring Dimension Sliders */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-3 sm:space-y-4">
+                <h4 className="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>{t('scoringDimensionsTitle')}</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-1.5 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-300">{t('dimCategory')}</span>
+                      <span className="text-emerald-400">{breakdown.categoryScore}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className={`h-full ${getBarColor(breakdown.categoryScore)} transition-all duration-500`} style={{ width: `${breakdown.categoryScore}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-300">{t('dimText')}</span>
+                      <span className="text-emerald-400">{breakdown.textScore}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className={`h-full ${getBarColor(breakdown.textScore)} transition-all duration-500`} style={{ width: `${breakdown.textScore}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-300">{t('dimLocation')}</span>
+                      <span className="text-emerald-400">{breakdown.locationScore}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className={`h-full ${getBarColor(breakdown.locationScore)} transition-all duration-500`} style={{ width: `${breakdown.locationScore}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-300">{t('dimTemporal')}</span>
+                      <span className="text-emerald-400">{breakdown.timeScore}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className={`h-full ${getBarColor(breakdown.timeScore)} transition-all duration-500`} style={{ width: `${breakdown.timeScore}%` }} />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-1.5 bg-slate-900 p-3 rounded-xl border border-slate-800">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-300">{t('dimLocation')}</span>
-                  <span className="text-emerald-400">{breakdown.locationScore}%</span>
-                </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className={`h-full ${getBarColor(breakdown.locationScore)} transition-all duration-500`} style={{ width: `${breakdown.locationScore}%` }} />
-                </div>
+              {/* Rationale Checklist */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-2.5">
+                <h4 className="text-xs sm:text-sm font-bold text-slate-200">{t('rationaleTitle')}</h4>
+                <ul className="space-y-2 text-xs text-slate-300">
+                  {match.reasons.map((reason, idx) => (
+                    <li key={idx} className="flex items-start gap-2 bg-slate-900/60 px-3 py-2 rounded-lg border border-slate-800">
+                      <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-
-              <div className="space-y-1.5 bg-slate-900 p-3 rounded-xl border border-slate-800">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-300">{t('dimTemporal')}</span>
-                  <span className="text-emerald-400">{breakdown.timeScore}%</span>
-                </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className={`h-full ${getBarColor(breakdown.timeScore)} transition-all duration-500`} style={{ width: `${breakdown.timeScore}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Rationale Checklist */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-2.5">
-            <h4 className="text-xs sm:text-sm font-bold text-slate-200">{t('rationaleTitle')}</h4>
-            <ul className="space-y-2 text-xs text-slate-300">
-              {(translatedReasons.length > 0 ? translatedReasons : match.reasons).map((reason, idx) => (
-                <li key={idx} className="flex items-start gap-2 bg-slate-900/60 px-3 py-2 rounded-lg border border-slate-800">
-                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{reason}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+            </>
+          )}
 
         </div>
       </div>

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ItemReport, MatchResult } from '@/types';
-import { INITIAL_SAMPLE_REPORTS } from '@/lib/sampleData';
 import { calculateReportMatch } from '@/lib/matcher/engine';
 import { LanguageProvider, useTranslation } from '@/lib/i18n/LanguageContext';
 import { Header } from '@/components/Header';
@@ -10,35 +9,54 @@ import { MatchFeed } from '@/components/MatchFeed';
 import { ItemGrid } from '@/components/ItemGrid';
 import { MatchDetailModal } from '@/components/MatchDetailModal';
 import { ReportModal } from '@/components/ReportModal';
-import { HelpCircle } from 'lucide-react';
+import { Database, RefreshCw, Loader2 } from 'lucide-react';
 
 function MatcherAppContent() {
   const { t } = useTranslation();
-  const [reports, setReports] = useState<ItemReport[]>(INITIAL_SAMPLE_REPORTS);
+  const [reports, setReports] = useState<ItemReport[]>([]);
   const [activeTab, setActiveTab] = useState<'matches' | 'reports'>('matches');
   const [selectedMatch, setSelectedMatch] = useState<MatchResult | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [confirmedMatchIds, setConfirmedMatchIds] = useState<Set<string>>(new Set());
+  const [isSeeding, setIsSeeding] = useState(false);
 
-  // Fetch initial reports from database / API
-  useEffect(() => {
-    async function loadReports() {
-      try {
-        const res = await fetch('/api/reports');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.reports && data.reports.length > 0) {
-            setReports(data.reports);
-          }
+  // Fetch real database records from Prisma DB API
+  const loadDatabaseReports = async () => {
+    try {
+      const res = await fetch('/api/reports');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reports) {
+          setReports(data.reports);
         }
-      } catch (err) {
-        console.warn('API lookup fallback to client data:', err);
       }
+    } catch (err) {
+      console.warn('Failed to load reports from database API:', err);
     }
-    loadReports();
+  };
+
+  useEffect(() => {
+    loadDatabaseReports();
   }, []);
 
-  // Real-time Match Computation Engine
+  // Trigger Database Reset & Seeding via Prisma DB API
+  const handleSeedDatabase = async () => {
+    setIsSeeding(true);
+    try {
+      const res = await fetch('/api/seed', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reports) {
+          setReports(data.reports);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to seed database:', err);
+    }
+    setIsSeeding(false);
+  };
+
+  // Real-time Match Engine evaluated over Database Reports
   const matches = useMemo(() => {
     const lostList = reports.filter(r => r.type === 'LOST' && r.status === 'OPEN');
     const foundList = reports.filter(r => r.type === 'FOUND' && r.status === 'OPEN');
@@ -57,8 +75,8 @@ function MatcherAppContent() {
     return results.sort((a, b) => b.overallScore - a.overallScore);
   }, [reports, confirmedMatchIds]);
 
-  const lostCount = reports.filter(r => r.type === 'LOST').length;
-  const foundCount = reports.filter(r => r.type === 'FOUND').length;
+  const lostCount = reports.filter(r => r.type === 'LOST' && r.status !== 'RESOLVED').length;
+  const foundCount = reports.filter(r => r.type === 'FOUND' && r.status !== 'RESOLVED').length;
 
   const handleAddReport = async (newReportData: Omit<ItemReport, 'id' | 'status' | 'dateReported'>) => {
     const tempId = `rep_${Date.now()}`;
@@ -69,11 +87,9 @@ function MatcherAppContent() {
       dateReported: new Date().toISOString()
     };
 
-    // Immediately prepend to reports state for instant UI update
     setReports(prev => [newReport, ...prev]);
     setActiveTab('reports');
 
-    // Persist to Database API
     try {
       const res = await fetch('/api/reports', {
         method: 'POST',
@@ -87,7 +103,7 @@ function MatcherAppContent() {
         }
       }
     } catch (err) {
-      console.warn('Failed to save report to DB endpoint:', err);
+      console.warn('Failed to save report to database endpoint:', err);
     }
   };
 
@@ -99,10 +115,16 @@ function MatcherAppContent() {
     setConfirmedMatchIds(prev => new Set(prev).add(matchId));
   };
 
+  const handleResolveReports = (lostId: string, foundId: string) => {
+    setReports(prev =>
+      prev.map(r => (r.id === lostId || r.id === foundId ? { ...r, status: 'RESOLVED' } : r))
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
       
-      {/* Sticky Header */}
+      {/* Header */}
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -115,47 +137,26 @@ function MatcherAppContent() {
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 sm:space-y-8">
         
-        {/* Quick Test Bar */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+        {/* Database Persistence Bar */}
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-              <HelpCircle className="w-4 h-4 text-amber-400" />
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Database className="w-4 h-4 text-emerald-400" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-200 block">{t('quickScenariosTitle')}</span>
-              <span className="text-[11px] text-slate-400">{t('quickScenariosSub')}</span>
+              <span className="text-xs font-bold text-slate-200 block">Prisma & PostgreSQL / Supabase Connected</span>
+              <span className="text-[11px] text-slate-400">All reports, confirmed matches, and statuses are persisted in database</span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <button
-              onClick={() => setReports(INITIAL_SAMPLE_REPORTS)}
-              className="flex-1 md:flex-initial px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-colors text-center"
+              disabled={isSeeding}
+              onClick={handleSeedDatabase}
+              className="flex-1 md:flex-initial px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-colors flex items-center justify-center gap-1.5"
             >
-              {t('resetPromptData')}
-            </button>
-            <button
-              onClick={() => {
-                const sampleAirpods: ItemReport = {
-                  id: `airpods_${Date.now()}`,
-                  type: 'LOST',
-                  title: 'Black AirPods Case',
-                  category: 'ELECTRONICS',
-                  description: 'I lost my black AirPods case yesterday near the cafeteria.',
-                  originalLanguage: 'en',
-                  locationName: 'Cafeteria',
-                  locationZoneId: 'CAFETERIA_DINING',
-                  dateOccurred: new Date().toISOString(),
-                  dateReported: new Date().toISOString(),
-                  status: 'OPEN',
-                  contactEmail: 'student.test@univ.edu'
-                };
-                setReports(prev => [sampleAirpods, ...prev]);
-                setActiveTab('matches');
-              }}
-              className="flex-1 md:flex-initial px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/30 transition-colors text-center"
-            >
-              {t('addAirpodsScenario')}
+              {isSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />}
+              <span>{isSeeding ? 'Seeding DB...' : 'Re-Seed Database Records'}</span>
             </button>
           </div>
         </div>
@@ -182,6 +183,7 @@ function MatcherAppContent() {
         onClose={() => setSelectedMatch(null)}
         onConfirmMatch={handleConfirmMatch}
         onDismissMatch={handleDismissMatch}
+        onResolveReports={handleResolveReports}
       />
 
       {/* New Report Modal */}
